@@ -3538,135 +3538,355 @@ dialog::backdrop{background:#0008}
   function dialog(h) { $('dlgBody').innerHTML = h; var d = $('dlg'); if (d.open) return; if (d.showModal) d.showModal(); else alert(d.textContent); }
 
 
-  // ================= 내 동화책 (사주 기반 동화풍 에세이) =================
-  function hasBatchim(word) {
-    if (!word) return false;
-    var ch = word.charCodeAt(word.length - 1);
+
+
+
+
+
+  // ================= 내 동화책 (서술형 에세이 · 현재대운+5년 · 물상·신살) =================
+  function hasBatchim(w) {
+    if (!w) return false;
+    var ch = w.charCodeAt(w.length - 1);
     if (ch < 0xAC00 || ch > 0xD7A3) return false;
     return ((ch - 0xAC00) % 28) !== 0;
   }
-  function josa(word, withB, withoutB) {
-    return word + (hasBatchim(word) ? withB : withoutB);
-  }
+  function josa(word, a, b) { return word + (hasBatchim(word) ? a : b); }
   function storyName(c) {
     var n = (c.input.name || '').trim();
-    return n ? n : (c.input.gender === 'M' ? '한 소년' : '한 소녀');
+    return n || (c.input.gender === 'M' ? '한 소년' : '한 소녀');
   }
-  function storyAgeNow(c) {
-    return Math.max(0, new Date().getFullYear() - c.input.year);
+  function clip(s, n) {
+    s = String(s || '').replace(/\s+/g, ' ').trim();
+    return s.length <= n ? s : s.slice(0, n - 1) + '…';
   }
-  function elStory(el) {
-    return ['푸른 나무와 숲의 기운', '따뜻한 불과 햇살의 기운', '든든한 흙과 산의 기운', '맑은 쇠와 보석의 기운', '깊은 물과 비의 기운'][el] || '자연의 기운';
+  function secParas(ana, id) {
+    var s = (ana.sections || []).filter(function (x) { return x.id === id; })[0];
+    return s ? (s.paragraphs || []).slice() : [];
   }
-  function levelStory(lv) {
-    if (!lv) return '잔잔한';
-    if (/대길|아주 좋|상길|대길/.test(lv)) return '눈부시게 빛나는';
-    if (/길|좋/.test(lv)) return '따뜻한';
-    if (/흉|나쁨|조심|주의/.test(lv)) return '구름 낀';
-    return '잔잔한';
+
+  var STEM_MUL = [
+    { n: '갑목', img: '하늘을 향해 곧게 오른 큰 나무', season: '봄의 새벽', mind: '개척과 곧은 의지', place: '숲의 중심' },
+    { n: '을목', img: '담장을 감는 꽃덩굴', season: '봄비 오후', mind: '유연한 적응과 미감', place: '정원' },
+    { n: '병화', img: '세상을 비추는 태양', season: '한여름 정오', mind: '밝음과 베풂', place: '광장과 무대' },
+    { n: '정화', img: '밤을 지키는 촛불', season: '초가을 밤', mind: '섬세한 열정', place: '서재와 공방' },
+    { n: '무토', img: '든든한 산과 제방', season: '환절기의 언덕', mind: '중심과 책임', place: '산등성이' },
+    { n: '기토', img: '만물을 키우는 논밭의 흙', season: '촉촉한 늦봄', mind: '포용과 실무', place: '밭과 창고' },
+    { n: '경금', img: '원석과 무쇠', season: '가을 바람 아침', mind: '결단과 원칙', place: '대장간' },
+    { n: '신금', img: '다듬어진 보석', season: '맑은 가을 저녁', mind: '완성도와 기준', place: '공방' },
+    { n: '임수', img: '도도히 흐르는 큰 강', season: '한겨울 강가', mind: '포용과 지혜', place: '항구' },
+    { n: '계수', img: '이슬과 샘물', season: '이른 봄 안개', mind: '감수성과 직관', place: '샘가' }
+  ];
+  var BR_MUL = [
+    { n: '자', ani: '쥐', sea: '한겨울 깊은 밤', img: '숨은 지하수와 창고', theme: '지혜·저장·예민한 감각' },
+    { n: '축', ani: '소', sea: '겨울에서 봄으로 넘어가는 흙', img: '창고와 묵은 땅', theme: '인내·축적·느리지만 단단한 힘' },
+    { n: '인', ani: '호랑이', sea: '이른 봄 숲', img: '호랑이 숨결이 도는 산기슭', theme: '시작·용기·이동' },
+    { n: '묘', ani: '토끼', sea: '꽃 피는 봄', img: '풀밭과 꽃길', theme: '성장·매력·관계의 부드러움' },
+    { n: '진', ani: '용', sea: '봄의 끝 안개 낀 저수지', img: '용이 숨은 연못', theme: '변화·습기·숨은 재주' },
+    { n: '사', ani: '뱀', sea: '초여름 열기', img: '뱀이 감긴 따뜻한 돌', theme: '지략·열정·은밀한 힘' },
+    { n: '오', ani: '말', sea: '한여름 정오', img: '말이 달리는 광야', theme: '드러남·명예·빠른 전개' },
+    { n: '미', ani: '양', sea: '늦여름 그늘', img: '양떼가 쉬는 언덕', theme: '돌봄·예술·감정의 여운' },
+    { n: '신', ani: '원숭이', sea: '초가을 바람', img: '금속 도구가 빛나는 공방', theme: '기술·이동·영리함' },
+    { n: '유', ani: '닭', sea: '맑은 가을', img: '결실이 차려진 마당', theme: '완성·평가·예리한 기준' },
+    { n: '술', ani: '개', sea: '늦가을 황토', img: '문을 지키는 언덕', theme: '수호·마감·신중함' },
+    { n: '해', ani: '돼지', sea: '초겨울 물가', img: '강으로 이어지는 포구', theme: '흐름·학습·포용' }
+  ];
+  var TG_MUL = [
+    { g: '비견', img: '어깨를 나란히 한 동료', act: '스스로 나서고 동등한 관계를 맺는 일', event: '동료·형제·경쟁자와의 협력이나 마찰' },
+    { g: '겁재', img: '몫을 나누는 강한 손', act: '기회를 붙잡거나 빼앗기고 다시 일어서는 일', event: '재물·지분·이권의 이동과 급한 결단' },
+    { g: '식신', img: '솜씨 있는 손과 밥상', act: '만들고 말하며 일상의 기쁨을 쌓는 일', event: '창작·발표·건강 관리와 소소한 성취' },
+    { g: '상관', img: '날카로운 붓', act: '규범을 흔들고 새 형식을 시도하는 일', event: '표현 사고·상사 갈등·파격적 시도' },
+    { g: '편재', img: '여러 갈래 길의 보따리', act: '여러 인연과 수입원을 동시에 움직이는 일', event: '투자·부업·이동과 여러 인연의 동시 전개' },
+    { g: '정재', img: '곡식 창고', act: '꾸준히 모으고 지키며 책임을 지는 일', event: '고정 수입·계약·배우자 재물과 생활 안정' },
+    { g: '편관', img: '시험의 언덕', act: '압박 속에서 실력과 권한을 얻거나 소모되는 일', event: '압박·승부·관재·수술·직장 위기나 돌파' },
+    { g: '정관', img: '관복과 도장', act: '규칙 안에서 자리와 신뢰를 쌓는 일', event: '승진·자격·공적 인정·결혼과 규율' },
+    { g: '편인', img: '외딴 서재의 낯선 책', act: '남과 다른 배움과 기술로 길을 내는 일', event: '이직·특수 학습·계획 변경과 고독 속 몰입' },
+    { g: '정인', img: '스승과 어머니의 등불', act: '배우고 기대며 자격과 지식을 쌓는 일', event: '학업·문서·보호·부동산과 도움의 손길' }
+  ];
+  var SINSAL_STORY = {
+    '천을귀인': { mean: '위기 속에서 귀인이 손을 내미는 별', event: '뜻밖의 도움과 보호, 위험 완화가 그 궁의 십성 영역에서 나타난다' },
+    '도화살': { mean: '꽃이 피어 눈길을 끄는 별', event: '매력과 이성 인연이 움직이지만 감정 구설과 유혹도 함께 온다' },
+    '역마살': { mean: '말발굽처럼 자리를 바꾸는 별', event: '이사·출장·직무 변경·해외 등 물리적 이동이 해당 십성 영역에서 일어난다' },
+    '화개살': { mean: '우산처럼 세상을 덮는 사색의 별', event: '학문·예술·종교·고독한 몰입이 깊어지고, 인성이면 공부와 자격, 재성이면 예술적 수익으로 흐른다' },
+    '양인살': { mean: '칼날처럼 날이 선 기운', event: '승부·수술·교통·격한 말다툼이 관성·재성 자리에서 과한 추진과 함께 오기 쉽다' },
+    '괴강살': { mean: '강물을 거스르는 카리스마', event: '극단적 선택과 강한 리더십, 고립이 한 번에 삶을 뒤집는 사건으로 놓이기 쉽다' },
+    '백호대살': { mean: '흰 호랑이의 급작스러운 발톱', event: '급병·수술·사고·급변이 배우자궁이나 신체 자리와 연결될 때 특히 유의해야 한다' },
+    '공망': { mean: '손으로 쥐어도 비는 자리', event: '기대만큼 실속이 없고 계약이 허해지며, 그 궁의 십성이 공허하게 느껴지는 때가 온다' },
+    '겁살': { mean: '갑자기 들이닥치는 위협', event: '도난·배신·급압이 비겁·재성 자리의 지분 다툼으로 읽힌다' },
+    '재살': { mean: '재물을 흔드는 별', event: '금전 손실·보증·충동적 지출이 재성 십성 입장에서 지갑을 연다' },
+    '천살': { mean: '하늘이 내리는 시련', event: '상위자·제도·외부 압력이 관성 자리에서 시험과 규제로 나타난다' },
+    '지살': { mean: '땅이 흔들리는 별', event: '기초·부동산·가족 터전의 동요가 인성·비겁 자리와 연결된다' },
+    '년살': { mean: '해마다 되풀이되는 구설', event: '소문과 오해, 반복되는 갈등 패턴이 삶을 맴돈다' },
+    '월살': { mean: '달처럼 차올랐다 기우는 감정', event: '감정 기복과 이별, 달 단위의 변동이 잦아진다' },
+    '망신살': { mean: '체면이 상하는 자리', event: '창피·폭로·실수 공개가 관·식상 자리에서 체면 사건으로 드러난다' },
+    '장성살': { mean: '깃발을 세우는 별', event: '리더 역할과 책임 가중, 명예가 관성·비겁 입장에서 앞장서게 한다' },
+    '반안살': { mean: '편안히 자리 잡는 별', event: '정착과 안정, 소속이 인성·재성 자리에서 집과 직장 안정의 기회로 온다' },
+    '육해살': { mean: '여섯 갈래로 얽히는 해로움', event: '사소한 손해와 반복 스트레스, 인간관계의 피곤이 쌓인다' },
+    '문창귀인': { mean: '붓과 책을 주는 별', event: '시험·글·자격·콘텐츠가 인성·식상 자리에서 학업과 표현 성과로 열린다' },
+    '학당귀인': { mean: '배움의 문을 여는 별', event: '학교·강의·스승 인연이 인성 십성의 사건으로 나타난다' },
+    '태극귀인': { mean: '음양 사이에서 길을 찾는 별', event: '전환기·중재·재교육이 인생 방향을 다시 짜는 계기가 된다' },
+    '천주성': { mean: '하늘이 머무르는 고독한 별', event: '고독과 몰입이 혼자만의 작업·수행 쪽으로 사건을 기울인다' }
+  };
+  var MUNCHANG = { 0: [5, 6], 1: [4, 5], 2: [2, 3], 3: [2, 3], 4: [2, 3], 5: [0, 1, 8, 9], 6: [11, 0], 7: [11, 0], 8: [8, 9], 9: [8, 9] };
+  var HAKDANG = { 0: [11, 0], 1: [0, 1], 2: [2, 3], 3: [3, 4], 4: [2, 3], 5: [3, 4], 6: [5, 6], 7: [6, 7], 8: [8, 9], 9: [9, 10] };
+  var TAEGEUK = { 0: [0, 6], 1: [1, 7], 2: [10, 4], 3: [11, 5], 4: [2, 8], 5: [3, 9], 6: [0, 6], 7: [1, 7], 8: [10, 4], 9: [11, 5] };
+
+  function sm(i) { return STEM_MUL[i] || STEM_MUL[0]; }
+  function bm(i) { return BR_MUL[i] || BR_MUL[0]; }
+  function tm(i) { return (i == null || i < 0) ? null : TG_MUL[i]; }
+
+  function collectSinsalOnPillar(p, dm) {
+    var tags = (p.tags || []).slice();
+    if (p.sinsal12) tags.push(p.sinsal12);
+    var br = p.branch;
+    if (MUNCHANG[dm] && MUNCHANG[dm].indexOf(br) >= 0) tags.push('문창귀인');
+    if (HAKDANG[dm] && HAKDANG[dm].indexOf(br) >= 0) tags.push('학당귀인');
+    if (TAEGEUK[dm] && TAEGEUK[dm].indexOf(br) >= 0) tags.push('태극귀인');
+    if (tags.indexOf('화개살') >= 0 && tags.indexOf('공망') >= 0) tags.push('천주성');
+    var uniq = [];
+    tags.forEach(function (t) { if (t && uniq.indexOf(t) < 0) uniq.push(t); });
+    return uniq;
   }
+
+  function resolveSinsal(t) {
+    if (SINSAL_STORY[t]) return SINSAL_STORY[t];
+    if (t.indexOf('망신') >= 0) return SINSAL_STORY['망신살'];
+    if (t.indexOf('화개') >= 0) return SINSAL_STORY['화개살'];
+    if (t.indexOf('역마') >= 0) return SINSAL_STORY['역마살'];
+    if (t.indexOf('백호') >= 0) return SINSAL_STORY['백호대살'];
+    if (t.indexOf('천을') >= 0) return SINSAL_STORY['천을귀인'];
+    if (t.indexOf('도화') >= 0) return SINSAL_STORY['도화살'];
+    if (t.indexOf('양인') >= 0) return SINSAL_STORY['양인살'];
+    if (t.indexOf('괴강') >= 0) return SINSAL_STORY['괴강살'];
+    if (t.indexOf('공망') >= 0) return SINSAL_STORY['공망'];
+    return null;
+  }
+
+  function relBranchText(a, b) {
+    if (a == null || b == null || a === b) return '';
+    var lines = [];
+    var na = D.BRANCHES_KO[a], nb = D.BRANCHES_KO[b];
+    if ((a + 6) % 12 === b) lines.push(na + (hasBatchim(na)?'과 ':'와 ') + nb + (hasBatchim(nb)?'이 ':'가 ') + '충하여 밀어내고 이동·결별·방향 전환을 부른다');
+    var hap = [[0,1],[2,11],[3,10],[4,9],[5,8],[6,7]];
+    hap.forEach(function (p) {
+      if ((p[0] === a && p[1] === b) || (p[0] === b && p[1] === a))
+        lines.push(na + (hasBatchim(na)?'과 ':'와 ') + nb + (hasBatchim(nb)?'이 ':'가 ') + '육합으로 끌어당겨 인연·계약·동거의 끈을 만든다');
+    });
+    var hyung = [[0,3],[1,7],[1,10],[2,5],[2,8],[5,8],[7,10]];
+    hyung.forEach(function (p) {
+      if ((p[0] === a && p[1] === b) || (p[0] === b && p[1] === a))
+        lines.push(na + (hasBatchim(na)?'과 ':'와 ') + nb + (hasBatchim(nb)?'이 ':'가 ') + '형으로 얽혀 예의·은혜·세력 다툼이 생기기 쉽다');
+    });
+    var pa = [[0,9],[1,4],[2,11],[3,6],[5,8],[7,10]];
+    pa.forEach(function (p) {
+      if ((p[0] === a && p[1] === b) || (p[0] === b && p[1] === a))
+        lines.push(na + (hasBatchim(na)?'과 ':'와 ') + nb + (hasBatchim(nb)?'이 ':'가 ') + '파하여 계획이 중간에 금이 가거나 일정이 어긋난다');
+    });
+    var hae = [[0,7],[1,6],[2,5],[3,4],[8,11],[9,10]];
+    hae.forEach(function (p) {
+      if ((p[0] === a && p[1] === b) || (p[0] === b && p[1] === a))
+        lines.push(na + (hasBatchim(na)?'과 ':'와 ') + nb + (hasBatchim(nb)?'이 ':'가 ') + '해하여 보이지 않는 손해와 오해가 스민다');
+    });
+    var wj = [[0,7],[1,6],[2,9],[3,8],[4,11],[5,10]];
+    wj.forEach(function (p) {
+      if ((p[0] === a && p[1] === b) || (p[0] === b && p[1] === a))
+        lines.push(na + (hasBatchim(na)?'과 ':'와 ') + nb + (hasBatchim(nb)?'이 ':'가 ') + '원진으로 가깝고도 미운 애증을 쌓는다');
+    });
+    return lines.join('. ');
+  }
+
   function generateFairyTale(chart, ana) {
-    var c = chart, a = ana || {}, P = c.pillars;
+    var c = chart, a = ana || {}, P = c.pillars, L = c.luck || {};
     var name = storyName(c);
     var isM = c.input.gender === 'M';
     var he = isM ? '그' : '그녀';
-    var him = isM ? '그를' : '그녀를';
     var his = isM ? '그의' : '그녀의';
-    var age = storyAgeNow(c);
+    var age = Math.max(0, new Date().getFullYear() - c.input.year);
+    var nowY = new Date().getFullYear();
     var dm = (P.day && P.day.stem != null) ? P.day.stem : 0;
+    var me = sm(dm);
+    var dayBr = bm(P.day.branch);
     var st = a.strength || {};
     var yong = a.yong || {};
     var gyeok = a.gyeok || {};
-    var yongEl = (yong.finalEl != null) ? yong.finalEl : 2;
+    var yongEl = yong.finalEl != null ? yong.finalEl : 2;
     var stLevel = st.level || '중화';
-    var gName = gyeok.name || '평범한 격';
-    var birthPlace = c.input.place || '어느 마을';
-    var birthTime = c.input.hourUnknown ? '시간이 기록되지 않은 어느 날' : (String(c.input.hour).padStart(2, '0') + '시 ' + String(c.input.minute || 0).padStart(2, '0') + '분 무렵');
+    var gName = gyeok.name || '';
     var daeunList = Array.isArray(a.daeun) ? a.daeun : [];
-    var pastDaeun = daeunList.filter(function (d) { return d.ageEnd < age || (d.current && d.ageStart <= age); });
-    var futureDaeun = daeunList.filter(function (d) { return d.ageStart > age; }).slice(0, 3);
-    var curDaeun = daeunList.filter(function (d) { return d.current; })[0];
-    var goodPast = pastDaeun.filter(function (d) { return (d.score || 0) >= 0.3; });
-    var hardPast = pastDaeun.filter(function (d) { return (d.score || 0) <= -0.3; });
-    var paragraphs = [];
-
-    paragraphs.push('먼 옛날도, 아주 가까운 오늘도 아닌, 바로 이 세상에 ' + josa(name, '이라는', '라는') + ' 이름이 태어났습니다. ' + c.input.year + '년 ' + c.input.month + '월 ' + c.input.day + '일, ' + birthPlace + '의 하늘 아래, ' + birthTime + '에 작은 생명이 눈을 떴습니다.');
-    paragraphs.push('사주팔자라는 오래된 별자리 지도에 따르면, ' + josa(name, '의', '의') + ' 마음 한가운데에는 ' + D.STEMS_KO[dm] + '(' + D.STEMS[dm] + ')이라는 일간(日干)이 자리 잡고 있었습니다. 그것은 ' + elStory(D.STEM_EL[dm]) + '을 닮은 본질이었습니다. 사람들은 그 기운을 "나"라고 부르지요.');
-    paragraphs.push('어린 ' + name + '은 연주와 월주가 그려 주는 집과 계절 속에서 자랐습니다. 월령의 사령은 ' + name + '에게 첫 번째 선생님처럼 세상을 가르쳤고, 지지에 숨은 지장간들은 보이지 않는 손길로 성격을 어루만졌습니다.');
-
-    if (/신강/.test(stLevel)) {
-      paragraphs.push('사주의 저울은 ' + name + '을 "자기 편이 많은 사람"으로 기록했습니다. 스스로의 기운이 든든해, 어려서부터 고집과 추진력이 남달랐습니다. 남들이 망설일 때 ' + he + '는 먼저 발을 내디뎠고, 때로는 그 힘이 주변을 압도하기도 했습니다.');
-    } else if (/신약/.test(stLevel)) {
-      paragraphs.push('사주의 저울은 ' + name + '을 "도움이 필요한 사람"으로 조용히 적어 두었습니다. 혼자서는 버거울 때가 많았지만, 대신 타인의 손길과 지혜를 받아들이는 귀가 열려 있었습니다. 약한 듯 보이면서도, 결국 주변의 힘으로 산을 넘는 사람이었습니다.');
-    } else {
-      paragraphs.push('사주의 저울은 ' + name + '을 어느 한쪽으로 치우치지 않은 "중화"의 자리에 두었습니다. 극단을 피하고 균형을 찾는 마음이, 어린 시절부터 ' + his + ' 선택의 나침반이 되어 주었습니다.');
-    }
-
-    paragraphs.push('격국은 "' + gName + '"이라 불렸습니다. 그것은 ' + name + '이 세상을 대하는 기본 자세와 같았습니다. 어떤 이는 그 격으로 명예와 책임을, 어떤 이는 재물과 표현을, 또 어떤 이는 학문과 인연을 삶의 기둥으로 삼았지요.');
-    paragraphs.push('하늘이 ' + name + '에게 내려 준 특별한 열쇠는 바로 용신(用神)이었습니다. ' + elStory(yongEl) + '— 그것이 ' + his + ' 삶을 조화롭게 만드는 빛과 물이었습니다. 용신이 가까이 오면 마음은 편안해지고, 일이 풀리며, 사람이 모였습니다. 반대로 기신(忌神)이 세차게 불어오면, 몸과 마음이 쉽게 지치고 선택의 갈림길이 헷갈렸습니다.');
-    paragraphs.push('시간은 10년 단위의 대운이라는 큰 강물을 따라 흘렀습니다.');
-
-    if (goodPast.length) {
-      var gp = goodPast.map(function (d) { return d.ageStart + '세부터 ' + d.ageEnd + '세까지의 "' + (d.ganjiKo || d.ganji || '') + '" 대운'; }).join(', ');
-      paragraphs.push(name + '의 지난 세월 속에서 특히 빛이 났던 시기는 ' + gp + '이었습니다. 그때 ' + he + '는 노력한 만큼의 열매를 맛보았고, 인연이 열리며, 스스로에게 "나는 할 수 있다"는 확신을 심었습니다. ' + levelStory(goodPast[0].level) + ' 바람이 등을 밀어 주던 시절이었습니다.');
-    }
-    if (hardPast.length) {
-      var hp = hardPast.map(function (d) { return d.ageStart + '~' + d.ageEnd + '세'; }).join(', ');
-      paragraphs.push('그러나 모든 강에 잔잔한 물결만 있는 것은 아니었습니다. ' + hp + ' 무렵, ' + name + '의 하늘에는 구름이 끼었습니다. 계획이 어긋나고, 몸이 먼저 신호를 보내고, 관계에서 상처가 남기도 했습니다. 그때 ' + he + '는 배우지 않으면 안 되는 것들을 배웠습니다. 속도를 늦추는 법, 손을 놓는 법, 그리고 다시 일어나는 법.');
-    }
-    if (!goodPast.length && !hardPast.length && pastDaeun.length) {
-      paragraphs.push('지나온 대운들은 극단적인 폭풍보다는, 잔잔히 흘러가며 ' + name + '의 성품을 천천히 깎고 다듬어 주었습니다. 큰 성공도 큰 실패도 아닌, 그러나 분명한 성장의 발자국들이 남겨졌습니다.');
-    }
-
-    paragraphs.push('그리고 지금, ' + name + '은 만으로 약 ' + age + '세의 강을 건너고 있습니다.');
-    if (curDaeun) {
-      var curMsg = (curDaeun.score >= 0.4)
-        ? '지금이야말로 씨앗을 뿌리고, 사람을 만나고, 오래 미뤄 둔 꿈을 다시 펼쳐 볼 시기입니다.'
-        : (curDaeun.score <= -0.4
-          ? '지금은 무리한 확장보다, 몸과 마음과 관계를 다독이는 계절입니다. 조용히 내실을 다지면, 다음 강물이 더 넓게 열립니다.'
-          : '좋은 일과 조심할 일이 함께 찾아오는 시기입니다. 준비된 만큼만 움직이고, 욕심을 조금 내려놓으면 길이 선명해집니다.');
-      paragraphs.push('현재의 대운은 "' + (curDaeun.ganjiKo || curDaeun.ganji || '') + '"(' + curDaeun.ageStart + '~' + curDaeun.ageEnd + '세)입니다. 이 10년의 색깔은 "' + (curDaeun.level || '보통') + '"에 가깝습니다. ' + curMsg);
-    }
-
-    paragraphs.push(name + '의 일지(日支)는 배우자궁이자 몸과 생활의 터전입니다. 그 자리에서 피어나는 십성의 기운은, ' + he + '가 사랑과 가정, 그리고 일상의 안정을 어떻게 가꾸는지를 조용히 암시합니다. 어떤 해에는 합(合)이 찾아와 인연이 맺어지고, 어떤 해에는 충(沖)이 불어와 관계와 거주가 움직이기도 합니다. 그것이 잘못이 아니라, 삶이 숨 쉬는 방식입니다.');
-    paragraphs.push('재물과 일의 흐름도 같은 강물 위에 있습니다. 식상(食傷)이 생재(生財)하는 구조가 뚜렷하면, ' + name + '은 손과 말로 가치를 만들어 내는 쪽에 재능이 있습니다. 재성이 과다하거나 신약으로 감당이 버거울 때는, "더 벌기"보다 "지키는 법"과 "나누는 법"을 먼저 배우라는 별의 속삭임이 들립니다.');
-    paragraphs.push('이제부터의 이야기는, 아직 쓰이지 않은 페이지입니다.');
-
-    if (futureDaeun.length) {
-      var bestF = futureDaeun.slice().sort(function (x, y) { return (y.score || 0) - (x.score || 0); })[0];
-      var hardF = futureDaeun.slice().sort(function (x, y) { return (x.score || 0) - (y.score || 0); })[0];
-      paragraphs.push('앞으로 찾아올 대운 가운데, 특히 "' + (bestF.ganjiKo || bestF.ganji || '') + '"(' + bestF.ageStart + '~' + bestF.ageEnd + '세) 무렵은 ' + name + '에게 문이 넓게 열릴 가능성이 큽니다. 그때를 향해 지금의 씨앗을 심어 두세요. 반대로 "' + (hardF.ganjiKo || hardF.ganji || '') + '" 구간에서는 속도를 조절하고, 건강과 신뢰를 우선하는 편이 지혜롭습니다.');
-    } else {
-      paragraphs.push('앞으로의 10년, 20년은 지금 ' + name + '이 내리는 작은 선택들이 모여 큰 강줄기를 이룰 것입니다. 용신인 ' + elStory(yongEl) + '을 가까이 두는 생활—그것이 곧 운이 좋아지는 가장 현실적인 방법입니다.');
-    }
-
-    paragraphs.push('사주는 운명을 가두는 쇠사슬이 아닙니다. 그것은 지도에 가깝습니다. 어느 길이 가파르고, 어느 골짜기에 샘이 있는지를 알려 줄 뿐입니다. 실제로 걸어가는 발은 언제나 ' + name + '의 것입니다.');
-    paragraphs.push('그래서 이 이야기는 이렇게 끝맺고 싶습니다. ' + name + '이 지금까지 걸어온 길은, 이미 하나의 동화였습니다. 아프고, 웃고, 넘어지고, 다시 일어선 모든 장면이 이미 충분히 아름다웠습니다. 그리고 앞으로의 페이지는, ' + he + '가 용신을 등불 삼아 스스로 써 내려갈 것입니다.');
-    paragraphs.push('별들은 오늘 밤에도 ' + name + '의 이름을 기억하고 있습니다. 부디, 자신의 속도대로, 자신의 빛으로 걸어가시기를.');
-
-    var extra = [];
-    extra.push('어린 시절의 ' + name + '은 계절이 바뀔 때마다 조금씩 다른 얼굴을 했습니다. 봄의 목(木) 기운이 강할 때는 호기심이 싹을 틔웠고, 여름의 화(火)가 가까우면 표현이 뜨거워졌으며, 가을의 금(金) 앞에서는 말수가 줄고 생각이 깊어졌습니다. 겨울의 수(水)가 스며들 때면, 혼자만의 시간 속에서 내면을 채우곤 했습니다. 그렇게 오행의 물감이 ' + his + ' 하루하루를 칠해 나갔습니다.');
-    extra.push('사람들이 "성격"이라고 부르는 것은, 사실 사주 속 십신들이 서로 이야기를 나누는 소리에 가깝습니다. 비겁이 많으면 주체성이 강해지고, 인성이 깊으면 배움과 돌봄이 삶의 기둥이 됩니다. 관성이 뚜렷하면 책임과 명예가, 재성이 살아 있으면 현실적인 안목이 ' + name + '을 이끌었습니다. 식상이 밝을 때는 말과 재능이 밖으로 흘러넘쳤지요.');
-    extra.push('건강이라는 주제에서도 사주는 속삭입니다. 오행의 과다와 부족은 몸과 마음의 리듬으로 나타납니다. 과한 불은 조급함과 열기를, 과한 물은 우울과 정체를, 부족한 흙은 불안을 부를 수 있습니다. 그러나 그것 역시 "조심하라"는 다정한 경고일 뿐입니다. 규칙적인 숨과 휴식, 그리고 용신을 돕는 생활 습관이 가장 좋은 부적입니다. ' + name + '의 몸이 보내는 신호를 무시하지 않는 것이, 긴 이야기를 쓰기 위한 첫 번째 약속입니다.');
-    extra.push('인연의 강에서는 합이 다리를 놓고, 충이 물살을 바꿉니다. ' + name + '이 만난 사람들, 떠나보낸 사람들, 아직 만나지 못한 사람들—그 모든 흐름이 우연이 아니라, 사주가 그려 둔 물길과 닮아 있습니다. 억지로 붙잡기보다, 흘러가게 두되 진심을 잃지 않는 것이 ' + his + ' 별자리가 가르치는 사랑의 방식입니다. 때로는 공망의 해가 찾아와 기대한 만큼의 실속이 없을 수도 있고, 천을귀인이 비추는 날에는 뜻밖의 도움이 손짓하기도 합니다.');
-    extra.push('일터와 배움의 길에서도 같은 별자리가 길을 비춥니다. 월지가 가리키는 사회궁, 관성과 인성의 배치, 대운에서 들어오는 십성의 색깔에 따라 ' + name + '은 어떤 해에는 도전을, 어떤 해에는 정리를 선택하게 됩니다. 중요한 것은 "운에 끌려가는 것"이 아니라, 운이 열어 준 문 앞에서 스스로 발을 내딛는 용기입니다.');
-    extra.push('언젠가 ' + name + '이 거울을 볼 때, 거기 비친 얼굴은 더 이상 "운명의 포로"가 아닐 것입니다. 그것은 자신의 선택을 존중하며 걸어온 사람의 얼굴, 동화 속 주인공이 현실에서도 주인공으로 사는 얼굴일 것입니다. 사주가 준 지도는 이미 충분히 다정했습니다. 남은 것은 ' + he + '가 그 지도를 손에 들고, 오늘 하루를 성실히 걸어가는 일입니다.');
-    extra.push('바람이 창을 두드리고, 먼 곳에서 기차 소리가 들릴 때, ' + name + '은 문득 생각날 것입니다. 태어나던 날의 하늘, 첫 대운이 들어오던 설렘, 힘들었던 해의 밤, 그리고 다시 아침이 밝아 오던 순간들. 그 모든 장면이 모여 지금의 ' + him + ' 만들었습니다. 앞으로도 마찬가지입니다. 좋은 대운이 오면 감사히 받아들이고, 어려운 대운이 오면 자신을 더 아껴 주면 됩니다.');
-
+    var keys = ['year', 'month', 'day', 'hour'];
+    var labels = { year: '연', month: '월', day: '일', hour: '시' };
+    var roleOf = { year: '초년과 배경, 조상의 바람', month: '사회와 부모, 직업의 들판', day: '나와 배우자, 몸의 방', hour: '말년과 자녀, 내면의 다락' };
     var NL = String.fromCharCode(10) + String.fromCharCode(10);
-    var body = paragraphs.concat(extra).join(NL);
-    if (body.length > 4200) {
-      var parts = body.split(NL);
-      var acc = '';
-      for (var i = 0; i < parts.length; i++) {
-        if ((acc + parts[i]).length > 4000) break;
+    var paras = [];
+
+    // 1. 도입
+    var intro = me.img + '이(가) ' + dayBr.sea + '의 풍경 속에서 걸어온 ' + josa(name, '의', '의') + ' 이야기다. ';
+    intro += c.input.year + '년 ' + c.input.month + '월 ' + c.input.day + '일, 일주는 ' + (P.day.ganjiKo || P.day.ganji) + '이고 일간은 ' + me.n + '이다. 물상으로 보면 ' + he + '는 ' + me.img + '와 같고, ' + me.season + ' 같은 마음으로 ' + me.place + '를 찾아 헤맨다. 지지 ' + dayBr.n + '(' + dayBr.ani + ')는 ' + dayBr.img + '의 자리이며, 그 주제는 ' + dayBr.theme + '에 가깝다. ';
+    var pers = secParas(a, 'personality');
+    if (pers[0]) intro += clip(pers[0], 200) + ' ';
+    if (pers[1]) intro += clip(pers[1], 160);
+    paras.push(intro);
+
+    // 2. 원국 총평
+    var home = '원국은 ' + josa(name, '이', '가') + ' 평생 들고 다니는 네 칸의 집이다. 연주 ' + P.year.ganjiKo + ', 월주 ' + P.month.ganjiKo + ', 일주 ' + P.day.ganjiKo + (P.hour ? ', 시주 ' + P.hour.ganjiKo : '') + '가 그 벽과 기둥을 이룬다. 격국은 "' + gName + '"로 읽히고, 일간의 무게는 "' + stLevel + '"이다. 대운은 ' + (L.forward ? '순행' : '역행') + '한다. 양남과 음녀는 순행, 음남과 양녀는 역행이며, 연간의 음양은 입춘 기준 사주 연도의 천간을 따른다. ';
+    home += '음양오행으로 보면 일간 ' + me.n + '은(는) ' + ['목', '화', '토', '금', '수'][D.STEM_EL[dm]] + '의 숨결을 몸속에 품고 있다. 목은 시작, 화는 드러냄, 토는 갈무리, 금은 결단, 수는 저장이다. 원국에 어느 오행이 많고 적은지가 ' + his + ' 리듬을 만들고, 용신 쪽 오행이 들어오는 해에는 숨이 트이며 기신 쪽 오행이 세차면 몸과 관계가 먼저 날씨를 알린다.';
+    paras.push(home);
+
+    // 3. 각 기둥 서술형
+    keys.forEach(function (k) {
+      var pillar = P[k];
+      if (!pillar) return;
+      var s = sm(pillar.stem);
+      var b = bm(pillar.branch);
+      var tgS = k === 'day' ? null : tm(pillar.tenGodStem);
+      var tgB = tm(pillar.tenGodBranch);
+      var t = labels[k] + '주에는 ' + roleOf[k] + '이 머문다. 하늘은 ' + s.n + ', 곧 ' + s.img + '의 기운이고, 땅은 ' + b.n + b.ani + '가 지키는 ' + b.img + '이며 ' + b.sea + '의 공기 속에 있다. ';
+      if (tgS) t += '천간 십성 ' + tgS.g + '은(는) ' + tgS.img + '처럼 움직여, ' + tgS.act + '을 부르고, 사건으로는 ' + tgS.event + '이 이 자리에서 피어난다. ';
+      if (tgB) t += '지지 십성 ' + tgB.g + '은(는) ' + tgB.act + '으로 이어지며, 십성 입장에서 보면 ' + tgB.event + ' 쪽이 생활의 장면이 된다. ';
+      var tags = collectSinsalOnPillar(pillar, dm);
+      if (tags.length) {
+        t += '이 기둥에는 ' + tags.join(', ') + '이(가) 깃들어 있다. ';
+        tags.forEach(function (tag) {
+          var info = resolveSinsal(tag);
+          if (!info) return;
+          var tgName = (tgB && tgB.g) || (tgS && tgS.g) || '일간';
+          t += tag + '은(는) ' + info.mean + '으로, ' + tgName + ' 십성의 자리에서 ' + info.event + '. ';
+        });
+      }
+      paras.push(t);
+    });
+
+    // 4. 지지 관계 서술
+    var rels = [];
+    for (var i = 0; i < keys.length; i++) {
+      for (var j = i + 1; j < keys.length; j++) {
+        var pa = P[keys[i]], pb = P[keys[j]];
+        if (!pa || !pb) continue;
+        var rt = relBranchText(pa.branch, pb.branch);
+        if (rt) rels.push(labels[keys[i]] + '지와 ' + labels[keys[j]] + '지에서는 ' + rt);
+      }
+    }
+    var branches = keys.map(function (k) { return P[k] && P[k].branch; }).filter(function (x) { return x != null; });
+    function hasPair(a, b) { return branches.indexOf(a) >= 0 && branches.indexOf(b) >= 0; }
+    if (hasPair(8, 0) || hasPair(0, 4) || hasPair(8, 4))
+      rels.push('수국(申子辰)의 기운이 감도어 흐름과 지혜, 이동의 물이 이야기 밑그림을 적신다');
+    if (hasPair(11, 3) || hasPair(3, 7) || hasPair(11, 7))
+      rels.push('목국(亥卯未)의 기운이 있어 성장과 관계, 시작의 봄바람이 불기 쉽다');
+    if (hasPair(2, 6) || hasPair(6, 10) || hasPair(2, 10))
+      rels.push('화국(寅午戌)의 기운이 드러나 표현과 명예, 열정의 여름이 강하다');
+    if (hasPair(5, 9) || hasPair(9, 1) || hasPair(5, 1))
+      rels.push('금국(巳酉丑)의 기운이 있어 결실과 기준, 정리의 가을이 강조된다');
+    if (rels.length) paras.push('지지들은 서로 대화한다. ' + rels.join('. ') + '. 이 관계들이 ' + josa(name, '의', '의') + ' 원국 안에서 인연과 사건, 이동과 고착의 패턴을 미리 그려 둔다.');
+
+    var job = secParas(a, 'job');
+    var love = secParas(a, 'love');
+    var talent = '';
+    if (job[0]) talent += '재능이 향하는 들판을 말하자면, ' + clip(job[0], 210) + ' ';
+    if (love[0]) talent += '인연의 줄거리는 이러하다. ' + clip(love[0], 180);
+    if (talent) paras.push(talent);
+
+    // 5. 현재 대운 서술
+    var cur = null;
+    for (var di = 0; di < daeunList.length; di++) {
+      if (daeunList[di].current) cur = daeunList[di];
+    }
+    if (!cur) {
+      for (var dj = 0; dj < daeunList.length; dj++) {
+        if (daeunList[dj].ageStart <= age && daeunList[dj].ageEnd >= age) cur = daeunList[dj];
+      }
+    }
+    var nowText = '지금은 만으로 약 ' + age + '세, ' + nowY + '년의 문 앞이다. 지나온 모든 대운을 나열하기보다, 현재의 기후와 앞으로 오 년의 날씨를 이야기 속에 담는다. ';
+    if (cur) {
+      var cStem = cur.ganji ? D.STEMS.indexOf(cur.ganji.charAt(0)) : -1;
+      var cBr = cur.ganji ? D.BRANCHES.indexOf(cur.ganji.charAt(1)) : -1;
+      var cs = cStem >= 0 ? sm(cStem) : null;
+      var cb = cBr >= 0 ? bm(cBr) : null;
+      var ctS = tm(cur.tenGodStem), ctB = tm(cur.tenGodBranch);
+      nowText += '현재 대운은 ' + (cur.ganjiKo || cur.ganji) + '(' + cur.ageStart + '~' + cur.ageEnd + '세, ' + cur.startYear + '~' + cur.endYear + '년)이며, 기운의 등급은 "' + (cur.level || '') + '"로 읽힌다. ';
+      if (cs) nowText += '이 십 년의 하늘은 ' + cs.img + ' 같고, 마음은 "' + cs.mind + '" 쪽으로 기울기 쉽다. ';
+      if (cb) nowText += '땅의 풍경은 ' + cb.img + '이며 ' + cb.sea + '의 공기 속에서 "' + cb.theme + '"가 주제가 된다. ';
+      if (ctS) nowText += '천간 손님 ' + ctS.g + '은(는) ' + ctS.event + '을 불러들인다. ';
+      if (ctB) nowText += '지지 손님 ' + ctB.g + '은(는) ' + ctB.event + ' 쪽으로 일상을 민다. ';
+      if (cur.summary) nowText += clip(cur.summary, 220) + ' ';
+      if (cur.domains) {
+        if (cur.domains.career) nowText += '일에서는 ' + clip(cur.domains.career, 110) + ' ';
+        if (cur.domains.wealth) nowText += '재물에서는 ' + clip(cur.domains.wealth, 90) + ' ';
+        if (cur.domains.love) nowText += '관계에서는 ' + clip(cur.domains.love, 90) + ' ';
+        if (cur.domains.health) nowText += '몸에서는 ' + clip(cur.domains.health, 90) + ' ';
+      }
+      if (cBr >= 0) {
+        var drels = [];
+        keys.forEach(function (k) {
+          if (!P[k]) return;
+          var rt = relBranchText(cBr, P[k].branch);
+          if (rt) drels.push('대운 지지와 ' + labels[k] + '지에서는 ' + rt);
+        });
+        if (drels.length) nowText += drels.join('. ') + '. ';
+      }
+      if (cur.chances && cur.chances.length) nowText += '기회가 열린다면 ' + cur.chances.slice(0, 3).join(', ') + ' 쪽이다. ';
+      if (cur.cautions && cur.cautions.length) nowText += '조심할 문턱은 ' + cur.cautions.slice(0, 3).join(', ') + '이다.';
+    }
+    paras.push(nowText);
+
+    // 6. 세운 5년 서술형
+    var yearMap = {};
+    daeunList.forEach(function (d) {
+      (d.years || []).forEach(function (y) { yearMap[y.year] = y; });
+    });
+    for (var yy = nowY; yy <= nowY + 5; yy++) {
+      var y = yearMap[yy];
+      if (!y) {
+        paras.push(yy + '년은 이 대운의 큰 기후 안에서 흘러가는 해로, 세운 세부가 구간에 없어도 현재 대운의 손님이 남긴 숙제를 이어 간다.');
+        continue;
+      }
+      var ytgS = tm(y.tenGodStem), ytgB = tm(y.tenGodBranch);
+      var yt = yy + '년, 세운 ' + (y.ganjiKo || y.ganji) + '의 해가 온다. 만으로 ' + (y.age != null ? y.age : (yy - c.input.year)) + '세, 기운은 "' + (y.level || '') + '"' + (yy === nowY ? '이며 바로 올해다' : '이다') + '. ';
+      if (ytgS) yt += '하늘의 십성 ' + ytgS.g + '은(는) ' + ytgS.img + '처럼 들어와 ' + ytgS.event + '을 암시하고, ';
+      if (ytgB) yt += '땅의 십성 ' + ytgB.g + '은(는) ' + ytgB.event + ' 쪽으로 생활을 기울인다. ';
+      if (y.theme) yt += '이 해의 주제는 "' + y.theme + '"에 가깝다. ';
+      if (y.good) yt += '좋은 바람이 분다면 ' + y.good + ' ';
+      if (y.caution) yt += '거친 바람이 분다면 ' + y.caution + ' ';
+      if (y.career) yt += '일터에서는 ' + y.career + ' ';
+      if (y.wealth) yt += '재물에서는 ' + y.wealth + ' ';
+      if (y.love) yt += '인연에서는 ' + y.love + ' ';
+      var evs = (y.events || []).slice(0, 3);
+      if (evs.length) yt += '원국과 맞부딪히는 신호로는 ' + evs.join(' 또한 ') + ' 등이 있다. ';
+      if (y.ganji && y.ganji.length >= 2) {
+        var yb = D.BRANCHES.indexOf(y.ganji.charAt(1));
+        if (yb >= 0 && P.day) {
+          var rday = relBranchText(yb, P.day.branch);
+          if (rday) yt += '세운과 일지가 만나면 ' + rday + ' 배우자·몸·생활 터전이 ' + ((ytgB && ytgB.g) || '십성') + '의 입장에서 흔들릴 수 있다. ';
+        }
+        if (yb >= 0 && P.month) {
+          var rmo = relBranchText(yb, P.month.branch);
+          if (rmo) yt += '세운과 월지에서는 ' + rmo + ' 직업과 사회의 자리가 움직이기 쉽다. ';
+        }
+      }
+      yt += '그리하여 이 해 ' + josa(name, '은', '는') + ' ';
+      if (ytgS) yt += ytgS.g;
+      if (ytgS && ytgB) yt += '와 ';
+      if (ytgB) yt += ytgB.g;
+      yt += '의 손님을 맞이한다. ';
+      if ((y.score || 0) >= 0.4) yt += '문을 두드려 볼 만한 날씨가 많은 해다.';
+      else if ((y.score || 0) <= -0.4) yt += '속도를 줄이고 몸과 신뢰를 지키는 쪽이 이로운 해다.';
+      else yt += '준비한 만큼만 결과가 따라오기 쉬운 해다.';
+      paras.push(yt);
+    }
+
+    // 7. 맺음
+    paras.push('사주는 지도이고, 걷는 발은 ' + josa(name, '의', '의') + ' 것이다. 용신의 계절을 생활 속에 불러들이고, 신살이 가리키는 십성 자리의 사건만 미리 알아채도, 같은 날씨를 다른 이야기로 쓸 수 있다. ' + josa(name, '은', '는') + ' 완벽을 기다리지 않고 무대에 오르는 연습, 끝이 있는 일을 스스로 선언하는 연습, 관계를 관리가 아니라 호흡으로 두는 연습을 통해 같은 사주를 다른 숲으로 바꿀 수 있다. 지나온 비와 볕, 합이 놓아 준 다리와 충이 흔들던 밤이 이미 ' + josa(name, '만', '만') + '의 이야기였고, 다음 장의 펜 역시 ' + josa(name, '이', '가') + ' 쥐고 있다.');
+
+    var body = paras.join(NL);
+    if (body.length > 14000) {
+      var parts = body.split(NL), acc = '', i;
+      for (i = 0; i < parts.length; i++) {
+        if ((acc + parts[i]).length > 12500) break;
         acc += (acc ? NL : '') + parts[i];
       }
       body = acc;
     }
     return {
       title: name + '의 사주 동화',
-      subtitle: c.input.year + '.' + c.input.month + '.' + c.input.day + ' 생 · ' + (isM ? '남성' : '여성') + ' · 용신 ' + (D.EL_KO[yongEl] || '') + ' · ' + stLevel,
+      subtitle: (P.day.ganjiKo || '') + ' 일주 · ' + me.img + ' · ' + (L.forward ? '순행' : '역행') + ' · ' + gName + ' · ' + stLevel,
       body: body,
       chars: body.replace(/\s/g, '').length
     };
@@ -3692,32 +3912,21 @@ dialog::backdrop{background:#0008}
   }
 
   function renderStoryBook(story) {
-    var c = state.chart;
     var h = '';
-    h += '<div class="fv-bar"><b>📖 내 동화책</b><span>사주 분석을 바탕으로 쓴 동화풍 에세이입니다. 인쇄 창에서 <b>"PDF로 저장"</b>을 선택하세요. (약 ' + story.chars + '자)</span>';
+    h += '<div class="fv-bar"><b>📖 내 동화책</b><span>서술형 에세이 · 약 ' + story.chars + '자 · 현재 대운 + 향후 5년</span>';
     h += '<button id="sbPrint" class="primary" type="button">📄 PDF 저장</button>';
-    h += '<button id="sbClose" class="ghost" type="button">← 분석으로 돌아가기</button></div>';
-    h += '<div class="story-book">';
-    h += '<div class="sb-cover"><div class="seal" style="margin:0 auto 8px;transform:rotate(-4deg)">命</div>';
-    h += '<h1>' + esc(story.title) + '</h1>';
-    h += '<p class="sub">' + esc(story.subtitle) + '</p>';
-    h += '<p class="sub" style="margin-top:8px">명식 · 사주팔자가 들려주는 삶의 이야기</p></div>';
-    h += '<div class="sb-body">';
-    h += '<p class="lead">이 이야기는 사주명리학의 원국·대운·용신·격국을 바탕으로, 실제 운명의 확정이 아닌 "경향과 상징"을 동화의 언어로 풀어 쓴 참고용 에세이입니다.</p>';
-    var parts = story.body.split(/\n\n+/);
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i].trim();
-      if (!p) continue;
-      if (p.indexOf('이제부터의 이야기') === 0 || p.indexOf('별들은') === 0) h += '<h3>이어질 페이지</h3>';
-      if (p.indexOf('시간은 10년') === 0) h += '<h3>흘러온 강물</h3>';
-      if (p.indexOf('그리고 지금') === 0) h += '<h3>오늘의 ' + esc(storyName(c)) + '</h3>';
-      h += '<p>' + esc(p) + '</p>';
-    }
-    h += '</div>';
-    h += '<p class="sb-meta">글자 수(공백 제외) 약 ' + story.chars + '자 · 카카오톡 ID temp21 · 본 자료는 오락·성찰용 참고 콘텐츠입니다.</p>';
-    h += '<div class="sb-actions"><button id="sbPrint2" class="primary" type="button">📄 이 동화책을 PDF로 저장</button>';
-    h += '<button id="sbCopy" class="ghost" type="button">텍스트 복사</button></div>';
-    h += '</div>';
+    h += '<button id="sbClose" class="ghost" type="button">← 돌아가기</button></div>';
+    h += '<div class="story-book"><div class="sb-cover"><div class="seal" style="margin:0 auto 8px;transform:rotate(-4deg)">命</div>';
+    h += '<h1>' + esc(story.title) + '</h1><p class="sub">' + esc(story.subtitle) + '</p></div><div class="sb-body">';
+    h += '<p class="lead">원국 물상·십성·신살과 지지 관계, 현재 대운과 향후 5년 세운을 서술형 에세이로 풀어 쓴 참고용 글입니다.</p>';
+    story.body.split(/\n\n+/).forEach(function (para) {
+      para = para.trim();
+      if (!para) return;
+      h += '<p>' + esc(para) + '</p>';
+    });
+    h += '</div><p class="sb-meta">약 ' + story.chars + '자 · 카카오톡 ID temp21 · 오락·성찰용</p>';
+    h += '<div class="sb-actions"><button id="sbPrint2" class="primary" type="button">📄 PDF 저장</button>';
+    h += '<button id="sbCopy" class="ghost" type="button">텍스트 복사</button></div></div>';
     $('warnings').innerHTML = '';
     $('chartBox').innerHTML = '';
     $('tabs').innerHTML = '';
@@ -3741,7 +3950,7 @@ dialog::backdrop{background:#0008}
     };
   }
 
-  (function bindStoryBtn() {
+  (function () {
     var b = $('btnStory');
     if (b) b.onclick = openStoryBook;
   })();
